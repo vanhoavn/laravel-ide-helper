@@ -21,20 +21,20 @@ class Alias
     protected $short;
     protected $namespace = '__root';
     protected $root = null;
-    protected $classes = array();
-    protected $methods = array();
-    protected $usedMethods = array();
+    protected $classes = [];
+    protected $methods = [];
+    protected $usedMethods = [];
     protected $valid = false;
-    protected $magicMethods = array();
-    protected $interfaces = array();
+    protected $magicMethods = [];
+    protected $interfaces = [];
 
     /**
      * @param string $alias
      * @param string $facade
-     * @param array $magicMethods
-     * @param array $interfaces
+     * @param array  $magicMethods
+     * @param array  $interfaces
      */
-    public function __construct($alias, $facade, $magicMethods = array(), $interfaces = array())
+    public function __construct($alias, $facade, $magicMethods = [], $interfaces = [])
     {
         $this->alias = $alias;
         $this->magicMethods = $magicMethods;
@@ -58,7 +58,7 @@ class Alias
         $this->detectExtendsNamespace();
 
         if ($facade === '\Illuminate\Database\Eloquent\Model') {
-            $this->usedMethods = array('decrement', 'increment');
+            $this->usedMethods = ['decrement', 'increment'];
         }
     }
 
@@ -145,6 +145,7 @@ class Alias
     {
         return $this->short;
     }
+
     /**
      * Get the namespace from the alias
      *
@@ -299,29 +300,7 @@ class Alias
 
         $mixins = [];
         foreach ($match[1] as $mixin) {
-            if (strpos($mixin, '\\') === false) {
-                $mixins[] = $reflection->getNamespaceName() . '\\' . $mixin;
-            } else {
-                $quoted = preg_quote($mixin);
-                $pattern = (
-                    '@^\s*use ((?P<name>([^;\s]*\\\\)?'
-                    .$quoted
-                    .')|(?P<name_alias>[^;\s]*)\s+as\s+'
-                    .$quoted
-                    .')@m'
-                );
-                if (preg_match( $pattern, $source, $m)) {
-                    if (!empty($m['name']) || !empty($m['name_alias'])) {
-                        if (!empty($m['name'])) {
-                            $mixins[] = $m['name'];
-                        } else {
-                            $mixins[] = $m['name_alias'];
-                        }
-                    } else {
-                        $mixins[] = $reflection->getNamespaceName() . '\\' . $mixin;
-                    }
-                }
-            }
+            $mixins[] = TypesResolving::resolveType($reflection->getNamespaceName(), trim($mixin), $source);
         }
 
         return $mixins;
@@ -404,7 +383,8 @@ class Alias
     /**
      * Output an error.
      *
-     * @param  string  $string
+     * @param  string $string
+     *
      * @return void
      */
     protected function error($string)
