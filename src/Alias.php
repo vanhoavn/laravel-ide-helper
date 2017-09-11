@@ -74,7 +74,7 @@ class Alias
             if (class_exists($class) || interface_exists($class)) {
                 $this->classes[] = $class;
             } else {
-                echo "Class not exists: $class\r\n";
+                fwrite(STDERR, "Class not exists: $class\r\n");
             }
         }
     }
@@ -292,15 +292,25 @@ class Alias
      */
     protected function getMixinClasses(\ReflectionClass $reflection)
     {
-        $comment = $reflection->getDocComment();
-        $file = $reflection->getFileName();
-        $source = file_get_contents($file);
-
-        preg_match_all('#@mixin\s+([^\s]+)#ism', $comment, $match);
-
         $mixins = [];
-        foreach ($match[1] as $mixin) {
-            $mixins[] = TypesResolving::resolveType($reflection->getNamespaceName(), trim($mixin), $source);
+        $queue = [$reflection];
+
+        while (!empty($queue)) {
+            $reflection = array_shift($queue);
+
+            $comment = $reflection->getDocComment();
+            $file = $reflection->getFileName();
+            $source = file_get_contents($file);
+
+            preg_match_all('#@mixin\s+([^\s]+)#ism', $comment, $match);
+
+            foreach ($match[1] as $mixin) {
+                $target = TypesResolving::resolveType($reflection->getNamespaceName(), trim($mixin), $source);
+                if (!in_array($target, $mixins)) {
+                    $mixins[] = $target;
+                    $queue[] = new \ReflectionClass($target);
+                }
+            }
         }
 
         return $mixins;
@@ -337,24 +347,30 @@ class Alias
                 }
             }
 
-            $mixins = $this->getMixinClasses($reflection);
+            if (!starts_with($class, "Illuminate") && !starts_with($class, "\\Illuminate")) {
+                $mixins = $this->getMixinClasses($reflection);
 
-            foreach ($mixins as $mixin) {
-                $mixin_reflection = new \ReflectionClass($mixin);
-                $mixin_methods = $mixin_reflection->getMethods(\ReflectionMethod::IS_PUBLIC);
-                if ($mixin_methods) {
-                    foreach ($mixin_methods as $method) {
-                        if (!in_array($method->name, $this->usedMethods)) {
-                            if ($this->extends !== $mixin && substr($method->name, 0, 2) !== '__') {
-                                $this->methods[] = new Method(
-                                    $method,
-                                    $this->alias,
-                                    $reflection,
-                                    $method->name,
-                                    $this->interfaces
-                                );
+                foreach ($mixins as $mixin) {
+                    $mixin_reflection = new \ReflectionClass($mixin);
+                    $mixin_methods = $mixin_reflection->getMethods(\ReflectionMethod::IS_PUBLIC);
+                    if ($mixin_methods) {
+                        foreach ($mixin_methods as $method) {
+                            if (substr($method->name, 0, 2) !== '__') {
+                                if (!in_array($method->name, $this->usedMethods)) {
+                                    if ($this->extends !== $mixin) {
+                                        $this->methods[] = new Method(
+                                            $method,
+                                            $this->alias,
+                                            $reflection,
+                                            $method->name,
+                                            $this->interfaces
+                                        );
+                                    }
+                                    $this->usedMethods[] = $method->name;
+                                } else {
+                                    fwrite(STDERR, "[WARNING] Duplicating method '{$method->name}' in facade {$class}\n");
+                                }
                             }
-                            $this->usedMethods[] = $method->name;
                         }
                     }
                 }
