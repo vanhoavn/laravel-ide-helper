@@ -29,6 +29,7 @@ class Macro extends Method
         //Normalize the description and inherit the docs from parents/interfaces
         try {
             $this->normalizeParams($this->phpdoc);
+            $this->normalizeThrows($this->phpdoc);
             $this->normalizeReturn($this->phpdoc);
             $this->normalizeDescription($this->phpdoc);
         } catch (\Exception $e) {

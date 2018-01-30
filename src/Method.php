@@ -58,6 +58,7 @@ class Method
         //Normalize the description and inherit the docs from parents/interfaces
         try {
             $this->normalizeParams($this->phpdoc);
+            $this->normalizeThrows($this->phpdoc);
             $this->normalizeReturn($this->phpdoc);
             $this->normalizeDescription($this->phpdoc);
         } catch (\Exception $e) {
@@ -161,6 +162,7 @@ class Method
             $phpdoc->setText($description);
 
             $this->normalizeParams($inheritdoc);
+            $this->normalizeThrows($inheritdoc);
             $this->normalizeReturn($inheritdoc);
 
             //Add the tags that are inherited
@@ -193,6 +195,29 @@ class Method
 
                 // Get the expanded type and re-set the content
                 $content = $this->resolveTypes($tag->getTypes()) . ' ' . $tag->getVariableName() . ' ' . $tag->getDescription();
+                $tag->setContent(trim($content));
+            }
+        }
+    }
+
+    /**
+     * Normalize the throws
+     *
+     * @param DocBlock $phpdoc
+     */
+    protected function normalizeThrows(DocBlock $phpdoc)
+    {
+        //Get the return type and adjust them for beter autocomplete
+        $throwsTags = $phpdoc->getTagsByName('throws');
+        if ($throwsTags) {
+            /** @var ParamTag $tag */
+            foreach ($throwsTags as $tag) {
+                // Convert the keywords
+                $content = $this->convertKeywords($tag->getContent());
+                $tag->setContent($content);
+
+                // Get the expanded type and re-set the content
+                $content = $this->resolveTypes($tag->getTypes()) . ' ' . $tag->getDescription();
                 $tag->setContent(trim($content));
             }
         }
