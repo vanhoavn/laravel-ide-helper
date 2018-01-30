@@ -334,6 +334,7 @@ class Alias
                         // Only add the methods to the output when the root is not the same as the class.
                         // And don't add the __*() methods
                         if (($this->extends !== $class || $method->isStatic()) && substr($method->name, 0, 2) !== '__') {
+                            if (!$this->isModulePublicMethod($method)) continue;
                             $this->methods[] = new Method(
                                 $method,
                                 $this->alias,
@@ -357,6 +358,7 @@ class Alias
                         foreach ($mixin_methods as $method) {
                             if (substr($method->name, 0, 2) !== '__') {
                                 if (!in_array($method->name, $this->usedMethods)) {
+                                    if (!$this->isModulePublicMethod($method)) continue;
                                     if ($this->extends !== $mixin) {
                                         $this->methods[] = new Method(
                                             $method,
@@ -383,6 +385,7 @@ class Alias
                 $macros = isset($properties['macros']) ? $properties['macros'] : [];
                 foreach ($macros as $macro_name => $macro_func) {
                     $function = new \ReflectionFunction($macro_func);
+                    if (!$this->isModulePublicMethod($function)) continue;
                     // Add macros
                     $this->methods[] = new Macro(
                         $function,
@@ -406,5 +409,21 @@ class Alias
     protected function error($string)
     {
         echo $string . "\r\n";
+    }
+
+    /**
+     * Check if a method is module public
+     *
+     * @param \ReflectionMethod $method
+     * @return boolean
+     */
+    private function isModulePublicMethod($method) {
+        $doc = $method->getDocComment();
+
+        if(\strpos($doc, "@module-only")) {
+            return false;
+        }
+
+        return true;
     }
 }
