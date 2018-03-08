@@ -2,7 +2,7 @@
 
 /**
  * A helper file for Laravel 5, to provide autocomplete information to your IDE
- * Generated for Laravel <?= $version ?> on <?= date("Y-m-d") ?>.
+ * Generated for Laravel <?= $version ?> on <?= date("Y-m-d H:i:s") ?>.
  *
  * This file should not be included in your code, only analyzed by your IDE!
  *
@@ -15,6 +15,7 @@
 namespace <?= $namespace == '__root' ? '' : trim($namespace, '\\') ?> {
 <?php foreach($aliases as $alias): ?>
 
+    <?= trim($alias->getDocComment('    ')) ?> 
     <?= $alias->getClassType() ?> <?= $alias->getExtendsClass() ?> {
         <?php foreach($alias->getMethods() as $method): ?>
 
