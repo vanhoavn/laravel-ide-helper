@@ -5,6 +5,7 @@
  *
  * @author Charles A. Peterson <artistan@gmail.com>
  */
+
 namespace Barryvdh\LaravelIdeHelper;
 
 use Illuminate\Console\Command;
@@ -66,7 +67,7 @@ class Eloquent
                         $command->error('File write failed to ' . $filename);
                     }
                 } else {
-                    $command->error('Content did not change ' . $contents);
+                    $command->error('Model content did not change');
                 }
             } else {
                 $command->error('No file contents found ' . $filename);
