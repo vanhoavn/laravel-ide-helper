@@ -59,11 +59,12 @@ class Alias
         }
 
         $this->addClass($this->root);
+        $this->detectFake();
         $this->detectNamespace();
         $this->detectClassType();
         $this->detectExtendsNamespace();
 
-        if(!empty($this->namespace)) {
+        if (!empty($this->namespace)) {
             //Create a DocBlock and serializer instance
             $this->phpdoc = new DocBlock(new ReflectionClass($alias), new Context($this->namespace));
         }
@@ -171,13 +172,37 @@ class Alias
     /**
      * Get the methods found by this Alias
      *
-     * @return array
+     * @return array|Method[]
      */
     public function getMethods()
     {
         $this->addMagicMethods();
         $this->detectMethods();
         return $this->methods;
+    }
+
+    /**
+     * Detect class returned by ::fake()
+     */
+    protected function detectFake()
+    {
+        $facade = $this->facade;
+
+        if (!method_exists($facade, 'fake')) {
+            return;
+        }
+
+        $real = $facade::getFacadeRoot();
+
+        try {
+            $facade::fake();
+            $fake = $facade::getFacadeRoot();
+            if ($fake !== $real) {
+                $this->addClass(get_class($fake));
+            }
+        } finally {
+            $facade::swap($real);
+        }
     }
 
     /**
@@ -286,7 +311,7 @@ class Alias
             $method = new \ReflectionMethod($className, $name);
             $class = new \ReflectionClass($className);
 
-            if (!in_array($method->name, $this->usedMethods)) {
+            if (!in_array($magic, $this->usedMethods)) {
                 if ($class !== $this->root) {
                     $this->methods[] = new Method($method, $this->alias, $class, $magic, $this->interfaces);
                 }
@@ -396,11 +421,9 @@ class Alias
                 $properties = $reflection->getStaticProperties();
                 $macros = isset($properties['macros']) ? $properties['macros'] : [];
                 foreach ($macros as $macro_name => $macro_func) {
-                    $function = new \ReflectionFunction($macro_func);
-                    if (!$this->isModulePublicMethod($function)) continue;
                     // Add macros
                     $this->methods[] = new Macro(
-                        $function,
+                        $this->getMacroFunction($macro_func),
                         $this->alias,
                         $reflection,
                         $macro_name,
@@ -412,6 +435,21 @@ class Alias
     }
 
     /**
+     * @param $macro_func
+     *
+     * @return \ReflectionFunctionAbstract
+     * @throws \ReflectionException
+     */
+    protected function getMacroFunction($macro_func)
+    {
+        if (is_array($macro_func) && is_callable($macro_func)) {
+            return new \ReflectionMethod($macro_func[0], $macro_func[1]);
+        }
+
+        return new \ReflectionFunction($macro_func);
+    }
+
+    /*
      * Get the docblock for this alias
      *
      * @param string $prefix
@@ -420,7 +458,12 @@ class Alias
     public function getDocComment($prefix = "\t\t")
     {
         $serializer = new DocBlockSerializer(1, $prefix);
-        return ($this->phpdoc) ? $serializer->getDocComment($this->phpdoc) : '';
+
+        if ($this->phpdoc) {
+            return $serializer->getDocComment($this->phpdoc);
+        }
+
+        return '';
     }
 
     /**
