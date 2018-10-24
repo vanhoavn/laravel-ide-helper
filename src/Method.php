@@ -45,7 +45,7 @@ class Method
      * @param string|null $methodName
      * @param array $interfaces
      */
-    public function __construct(\ReflectionMethod $method, $alias, $class, $methodName = null, $interfaces = [])
+    public function __construct($method, $alias, $class, $methodName = null, $interfaces = [])
     {
         $this->method = $method;
         $this->interfaces = $interfaces;
