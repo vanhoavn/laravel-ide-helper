@@ -82,7 +82,7 @@ class Method
      */
     protected function initPhpDoc($method)
     {
-        $this->phpdoc = new DocBlock($method, new Context($this->namespace));
+        $this->phpdoc = new DocBlock($method, new Context(self::FAKE_CONTEXT));
     }
 
     /**
