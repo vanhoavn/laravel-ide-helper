@@ -51,7 +51,6 @@ class Alias
      * @param array  $magicMethods
      * @param array  $interfaces
      */
-    public function __construct($alias, $facade, $magicMethods = [], $interfaces = [])
     public function __construct($config, $alias, $facade, $magicMethods = array(), $interfaces = array())
     {
         $this->alias = $alias;
