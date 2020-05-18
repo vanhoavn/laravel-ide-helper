@@ -16,6 +16,8 @@ use Barryvdh\Reflection\DocBlock\Tag;
 use Barryvdh\Reflection\DocBlock\Tag\ReturnTag;
 use Barryvdh\Reflection\DocBlock\Tag\ParamTag;
 use Barryvdh\Reflection\DocBlock\Serializer as DocBlockSerializer;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class Method
 {
@@ -37,6 +39,7 @@ class Method
     protected $real_name;
     protected $return = null;
     protected $file = null;
+    protected $root;
 
     /**
      * @param \ReflectionMethod|\ReflectionFunctionAbstract $method
@@ -50,8 +53,11 @@ class Method
         $this->method = $method;
         $this->interfaces = $interfaces;
         $this->name = $methodName ?: $method->name;
-        $this->real_name = $method->name;
+        $this->real_name = $method->isClosure() ? $this->name : $method->name;
         $this->initClassDefinedProperties($method, $class);
+
+        //Reference the 'real' function in the declaring class
+        $this->root = '\\' . ltrim($class->getName(), '\\');
 
         $this->file = $method->getFileName();
 
@@ -72,9 +78,6 @@ class Method
 
         //Make the method static
         $this->phpdoc->appendTag(Tag::createInstance('@static', $this->phpdoc));
-
-        //Reference the 'real' function in the declaring class
-        $this->root = '\\' . ltrim($class->getName(), '\\');
     }
 
     /**
@@ -114,6 +117,26 @@ class Method
     public function getRoot()
     {
         return $this->root;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isInstanceCall()
+    {
+        return ! ($this->method->isClosure() || $this->method->isStatic());
+    }
+
+    /**
+     * @return string
+     */
+    public function getRootMethodCall()
+    {
+        if ($this->isInstanceCall()) {
+            return "\$instance->{$this->getRealName()}({$this->getParams()})";
+        } else {
+            return "{$this->getRoot()}::{$this->getRealName()}({$this->getParams()})";
+        }
     }
 
     /**
@@ -276,6 +299,12 @@ class Method
             // Set the changed content
             $tag->setContent($returnValue . ' ' . $tag->getDescription());
             $this->return = $returnValue;
+
+            if ($tag->getType() === '$this') {
+                Str::contains($this->root, Builder::class)
+                    ? $tag->setType($this->root . '|static')
+                    : $tag->setType($this->root);
+            }
         } else {
             $this->return = null;
         }
@@ -324,14 +353,14 @@ class Method
         $params = [];
         $paramsWithDefault = [];
         foreach ($method->getParameters() as $param) {
-            $paramStr = '$' . $param->getName();
+            $paramStr = $param->isVariadic() ? '...$' . $param->getName() : '$' . $param->getName();
             $params[] = $paramStr;
-            if ($param->isOptional()) {
+            if ($param->isOptional() && !$param->isVariadic()) {
                 $default = $param->isDefaultValueAvailable() ? $param->getDefaultValue() : null;
                 if (is_bool($default)) {
                     $default = $default ? 'true' : 'false';
                 } elseif (is_array($default)) {
-                    $default = 'array()';
+                    $default = '[]';
                 } elseif (is_null($default)) {
                     $default = 'null';
                 } elseif (is_int($default)) {
@@ -339,7 +368,7 @@ class Method
                 } elseif (is_resource($default)) {
                     //skip to not fail
                 } else {
-                    $default = "'" . trim($default) . "'";
+                    $default = var_export($default, true);
                 }
                 $paramStr .= " = $default";
             }
